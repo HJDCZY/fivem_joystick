@@ -17,7 +17,7 @@ class JoystickGUI:
         
         self.root = tk.Tk()
         self.root.title("摇杆监视器")
-        self.root.geometry("400x800")
+        self.root.geometry("600x800")
 
         # 添加按键绑定相关变量
         self.waiting_for_keyboard = False
@@ -275,7 +275,7 @@ class JoystickGUI:
             
             # 更新按钮状态
             self.connect_button.config(text="等待连接", state="disabled")
-            self.display("WebSocket服务器已启动,等待客户端连接...")
+            # self.display("WebSocket服务器已启动,等待客户端连接...")
                 
         except Exception as e:
             print(f"启动失败: {str(e)}")
@@ -285,7 +285,11 @@ class JoystickGUI:
         """处理WebSocket连接"""
         try:
             self.ws = websocket
-            self.display("客户端已连接")
+            # 更新连接状态显示
+            self.root.after(0, lambda: (
+                self.connect_button.config(text="已连接", state="disabled"),
+                # self.display("客户端已连接")
+            ))
             print("客户端已连接")
             
             # 等待接收连接消息
@@ -304,10 +308,18 @@ class JoystickGUI:
                 
         except websockets.exceptions.ConnectionClosed as e:
             print(f"连接关闭原因: {e}")
-            self.display("客户端断开连接")
+            # 更新断开连接状态显示
+            self.root.after(0, lambda: (
+                self.connect_button.config(text="允许fivem连接", state="normal"),
+                # self.display("客户端断开连接")
+            ))
         except Exception as e:
             print(f"连接错误详情: {str(e)}")
-            self.display(f"连接错误: {str(e)}")
+            # 更新错误状态显示
+            self.root.after(0, lambda: (
+                self.connect_button.config(text="允许fivem连接", state="normal"),
+                self.display(f"连接错误: {str(e)}")
+            ))
         finally:
             self.ws = None
     
@@ -408,13 +420,24 @@ class JoystickGUI:
     def complete_binding(self, joystick_button):
         """完成按键绑定"""
         if self.waiting_for_joystick and self.temp_keyboard_key:
-            self.key_bindings[int(joystick_button)] = self.temp_keyboard_key
-            self.binding_label.config(
-                text=f"绑定完成: 摇杆按键 {joystick_button} -> 键盘按键 {self.temp_keyboard_key}"
-            )
-            self.waiting_for_joystick = False
-            self.temp_keyboard_key = None
-            self.binding_button.config(state="normal")
+            try:
+                # 尝试验证按键是否可用
+                keyboard.parse_hotkey(self.temp_keyboard_key)
+                
+                # 如果验证通过，完成绑定
+                self.key_bindings[int(joystick_button)] = self.temp_keyboard_key
+                self.binding_label.config(
+                    text=f"绑定完成: 摇杆按键 {joystick_button} -> 键盘按键 {self.temp_keyboard_key}"
+                )
+            except ValueError as e:
+                # 按键无效，取消本次绑定
+                self.binding_label.config(
+                    text=f"绑定失败: 无效的键盘按键 {self.temp_keyboard_key}"
+                )
+            finally:
+                self.waiting_for_joystick = False
+                self.temp_keyboard_key = None
+                self.binding_button.config(state="normal")
 
     def start_command_binding(self):
         """开始命令绑定过程"""
@@ -485,6 +508,8 @@ if __name__ == "__main__":
         gui.root.mainloop()
     finally:
         gui.running = False
-        if hasattr(gui, 'loop_thread'):
+        # 安全检查 loop_thread 是否存在和是否已初始化
+        if hasattr(gui, 'loop_thread') and gui.loop_thread is not None:
             gui.loop_thread.join(timeout=1.0)
-        thread.join(timeout=1.0)
+        if thread is not None:
+            thread.join(timeout=1.0)
