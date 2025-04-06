@@ -80,8 +80,10 @@ function initUDPConnection() {
 
 // 添加重连事件监听器
 window.addEventListener('message', (event) => {
-    if (event.data.type === 'joystick:reconnect') {
-        console.log('收到重连请求');
+    const data = event.data;
+    
+    if (data.type === 'joystick:reconnect') {
+        console.log('收到NUI重连请求');
         if (socket && socket.readyState === WebSocket.OPEN) {
             socket.close(1000, '手动重连');
         }

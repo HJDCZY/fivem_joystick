@@ -5,7 +5,9 @@ local joystickData = {
 
 -- 注册一个joystick命令用于重新连接
 RegisterCommand('joystick', function(source, args, rawCommand)
-    TriggerEvent('joystick:reconnect')
+    SendNUIMessage({
+        type = 'joystick:reconnect'
+    })
 end, false)
 
 -- 注册NUI回调,只用于更新数据
