@@ -6,6 +6,8 @@ import time
 import asyncio
 import websockets
 import keyboard  # 新增导入
+import json
+import os
 
 class JoystickGUI:
     def __init__(self):
@@ -150,6 +152,17 @@ class JoystickGUI:
         )
         self.command_bind_button.grid(row=0, column=2, padx=5, pady=5)
 
+        # 在button_frame中添加保存配置按钮
+        self.save_config_button = ttk.Button(
+            self.button_frame,
+            text="保存配置",
+            command=self.save_config
+        )
+        self.save_config_button.grid(row=0, column=3, padx=10)
+
+        # 加载配置
+        self.load_config()
+        
         # 调整其他元素的行号
         self.button_frame.grid(row=8, column=0, columnspan=3, pady=10)
 
@@ -449,6 +462,52 @@ class JoystickGUI:
         self.temp_command = command
         self.command_label.config(text="请按下要绑定的摇杆按键...")
         self.command_bind_button.config(state="disabled")
+
+    def save_config(self):
+        """保存配置到文件"""
+        config = {
+            'axis_reversed': self.axis_reversed,
+            'zr_swapped': self.zr_swapped,
+            'key_bindings': {str(k): v for k, v in self.key_bindings.items()},
+            'command_bindings': {str(k): v for k, v in self.command_bindings.items()}
+        }
+        
+        try:
+            with open('joystick_config.json', 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"保存配置失败: {str(e)}")
+
+    def load_config(self):
+        """从文件加载配置"""
+        if not os.path.exists('joystick_config.json'):
+            return
+            
+        try:
+            with open('joystick_config.json', 'r', encoding='utf-8') as f:
+                config = json.load(f)
+                
+            # 加载反向设置
+            self.axis_reversed = config.get('axis_reversed', [False] * 4)
+            for i, reversed_state in enumerate(self.axis_reversed):
+                if reversed_state:
+                    self.reverse_buttons[i].config(text="反向")
+                    
+            # 加载ZR翻转设置
+            self.zr_swapped = config.get('zr_swapped', False)
+            if self.zr_swapped:
+                self.zr_swap_button.config(text="ZR翻转: 开启")
+                
+            # 加载按键绑定
+            key_bindings = config.get('key_bindings', {})
+            self.key_bindings = {int(k): v for k, v in key_bindings.items()}
+            
+            # 加载命令绑定
+            command_bindings = config.get('command_bindings', {})
+            self.command_bindings = {int(k): v for k, v in command_bindings.items()}
+            
+        except Exception as e:
+            print(f"加载配置失败: {str(e)}")
             
 def joystick_thread(gui):
     pygame.init()
