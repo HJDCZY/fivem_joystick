@@ -17,7 +17,7 @@ class JoystickGUI:
         
         self.root = tk.Tk()
         self.root.title("摇杆监视器")
-        self.root.geometry("400x600")
+        self.root.geometry("400x800")
 
         # 添加按键绑定相关变量
         self.waiting_for_keyboard = False
@@ -25,6 +25,9 @@ class JoystickGUI:
         self.temp_keyboard_key = None
         self.key_bindings = {}  # {joystick_button: keyboard_key}
         self.keyboard_state = {}  # 记录键盘按键状态
+        self.command_bindings = {}  # {joystick_button: command}
+        self.waiting_for_command = False
+        self.temp_command = None
         
 
         # 创建滑块
@@ -130,8 +133,25 @@ class JoystickGUI:
         )
         self.binding_button.grid(row=0, column=1, padx=5, pady=5)
 
+        # 在binding_frame中添加命令绑定区域
+        self.command_binding_frame = ttk.LabelFrame(self.root, text="命令绑定")
+        self.command_binding_frame.grid(row=7, column=0, columnspan=4, padx=5, pady=5, sticky="nsew")
+        
+        self.command_label = ttk.Label(self.command_binding_frame, text="未绑定命令")
+        self.command_label.grid(row=0, column=0, padx=5, pady=5)
+        
+        self.command_entry = ttk.Entry(self.command_binding_frame)
+        self.command_entry.grid(row=0, column=1, padx=5, pady=5)
+        
+        self.command_bind_button = ttk.Button(
+            self.command_binding_frame,
+            text="绑定命令",
+            command=self.start_command_binding
+        )
+        self.command_bind_button.grid(row=0, column=2, padx=5, pady=5)
+
         # 调整其他元素的行号
-        self.button_frame.grid(row=7, column=0, columnspan=3, pady=10)
+        self.button_frame.grid(row=8, column=0, columnspan=3, pady=10)
 
     def update_values(self, values):
         for i, value in enumerate(values):
@@ -147,6 +167,16 @@ class JoystickGUI:
                 key = self.key_bindings[button_num]
                 keyboard.release(key)
                 self.keyboard_state[button_num] = False
+
+        # 处理命令绑定
+        if self.waiting_for_command and len(buttons) == 1:
+            button_num = int(buttons[0])
+            self.command_bindings[button_num] = self.temp_command
+            self.command_label.config(text=f"命令绑定完成: 按键 {button_num} -> {self.temp_command}")
+            self.waiting_for_command = False
+            self.temp_command = None
+            self.command_bind_button.config(state="normal")
+            return
 
         if buttons:
             self.button_label.config(text=f"按下的按钮: {', '.join(buttons)}")
@@ -164,6 +194,14 @@ class JoystickGUI:
                     if not self.keyboard_state.get(button_num, False):
                         keyboard.press(key)
                         self.keyboard_state[button_num] = True
+
+                # 发送绑定的命令
+                if button_num in self.command_bindings:
+                    command = self.command_bindings[button_num]
+                    # 发送命令到WebSocket客户端
+                    if self.ws:
+                        data = f"cmd:{command}"
+                        asyncio.run_coroutine_threadsafe(self.ws.send(data), self.loop)
         else:
             self.button_label.config(text="没有按钮被按下")
 
@@ -206,7 +244,7 @@ class JoystickGUI:
     def display(self , message):
         # 将“检测到摇杆”等消息显示在GUI上
         label = ttk.Label(self.root, text=message)
-        label.grid(row=8, column=0, columnspan=3, pady=10)
+        label.grid(row=10, column=0, columnspan=3, pady=10)
 
 
 
@@ -377,6 +415,17 @@ class JoystickGUI:
             self.waiting_for_joystick = False
             self.temp_keyboard_key = None
             self.binding_button.config(state="normal")
+
+    def start_command_binding(self):
+        """开始命令绑定过程"""
+        command = self.command_entry.get()
+        if not command:
+            return
+            
+        self.waiting_for_command = True
+        self.temp_command = command
+        self.command_label.config(text="请按下要绑定的摇杆按键...")
+        self.command_bind_button.config(state="disabled")
             
 def joystick_thread(gui):
     pygame.init()
