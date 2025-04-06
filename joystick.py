@@ -5,6 +5,7 @@ import threading
 import time
 import asyncio
 import websockets
+import keyboard  # 新增导入
 
 class JoystickGUI:
     def __init__(self):
@@ -17,6 +18,13 @@ class JoystickGUI:
         self.root = tk.Tk()
         self.root.title("摇杆监视器")
         self.root.geometry("400x600")
+
+        # 添加按键绑定相关变量
+        self.waiting_for_keyboard = False
+        self.waiting_for_joystick = False
+        self.temp_keyboard_key = None
+        self.key_bindings = {}  # {joystick_button: keyboard_key}
+        self.keyboard_state = {}  # 记录键盘按键状态
         
 
         # 创建滑块
@@ -108,6 +116,23 @@ class JoystickGUI:
         # 用于停止线程的标志
         self.running = True
 
+        # 在button_frame之前添加按键绑定框架
+        self.binding_frame = ttk.LabelFrame(self.root, text="按键绑定")
+        self.binding_frame.grid(row=6, column=0, columnspan=4, padx=5, pady=5, sticky="nsew")
+        
+        self.binding_label = ttk.Label(self.binding_frame, text="未进行按键绑定")
+        self.binding_label.grid(row=0, column=0, padx=5, pady=5)
+        
+        self.binding_button = ttk.Button(
+            self.binding_frame,
+            text="绑定新按键",
+            command=self.start_key_binding
+        )
+        self.binding_button.grid(row=0, column=1, padx=5, pady=5)
+
+        # 调整其他元素的行号
+        self.button_frame.grid(row=7, column=0, columnspan=3, pady=10)
+
     def update_values(self, values):
         for i, value in enumerate(values):
             if i < len(self.sliders):
@@ -115,8 +140,30 @@ class JoystickGUI:
                 self.labels[i].config(text=f"{value:.2f}")
 
     def update_buttons(self, buttons):
+        """更新按钮状态，并处理按键绑定"""
+        # 先处理键盘按键的释放
+        for button_num in self.keyboard_state:
+            if str(button_num) not in buttons and self.keyboard_state[button_num]:
+                key = self.key_bindings[button_num]
+                keyboard.release(key)
+                self.keyboard_state[button_num] = False
+
         if buttons:
             self.button_label.config(text=f"按下的按钮: {', '.join(buttons)}")
+            
+            # 处理按键绑定
+            if self.waiting_for_joystick and len(buttons) == 1:
+                self.complete_binding(buttons[0])
+                return
+            
+            # 模拟按下绑定的键盘按键
+            for button in buttons:
+                button_num = int(button)
+                if button_num in self.key_bindings:
+                    key = self.key_bindings[button_num]
+                    if not self.keyboard_state.get(button_num, False):
+                        keyboard.press(key)
+                        self.keyboard_state[button_num] = True
         else:
             self.button_label.config(text="没有按钮被按下")
 
@@ -159,7 +206,7 @@ class JoystickGUI:
     def display(self , message):
         # 将“检测到摇杆”等消息显示在GUI上
         label = ttk.Label(self.root, text=message)
-        label.grid(row=6, column=0, columnspan=3, pady=10)
+        label.grid(row=8, column=0, columnspan=3, pady=10)
 
 
 
@@ -302,8 +349,35 @@ class JoystickGUI:
         # 退出程序
         self.root.quit()
         
+    def start_key_binding(self):
+        """开始按键绑定过程"""
+        self.waiting_for_keyboard = True
+        self.binding_label.config(text="请按下要绑定的键盘按键...")
+        self.binding_button.config(state="disabled")
         
-
+        # 绑定键盘事件
+        self.root.bind('<Key>', self.on_keyboard_press)
+        
+    def on_keyboard_press(self, event):
+        """处理键盘按键事件"""
+        if self.waiting_for_keyboard:
+            self.temp_keyboard_key = event.keysym
+            self.waiting_for_keyboard = False
+            self.waiting_for_joystick = True
+            self.binding_label.config(text=f"已记录键盘按键: {event.keysym}\n请按下要绑定的摇杆按键...")
+            self.root.unbind('<Key>')
+            
+    def complete_binding(self, joystick_button):
+        """完成按键绑定"""
+        if self.waiting_for_joystick and self.temp_keyboard_key:
+            self.key_bindings[int(joystick_button)] = self.temp_keyboard_key
+            self.binding_label.config(
+                text=f"绑定完成: 摇杆按键 {joystick_button} -> 键盘按键 {self.temp_keyboard_key}"
+            )
+            self.waiting_for_joystick = False
+            self.temp_keyboard_key = None
+            self.binding_button.config(state="normal")
+            
 def joystick_thread(gui):
     pygame.init()
     pygame.joystick.init()
