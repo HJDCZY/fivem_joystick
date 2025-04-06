@@ -22,6 +22,22 @@ function initUDPConnection() {
         };
         socket.onmessage = (event) => {
             try {
+                // 检查是否是命令数据
+                if (event.data.startsWith('cmd:')) {
+                    const command = event.data.substring(4);
+                    fetch(`https://joystick/executeCommand`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ command })
+                    }).catch(err => {
+                        console.error('发送命令错误:', err);
+                    });
+                    return;
+                }
+
+                // 处理常规摇杆数据
                 const values = event.data.split(',').map(v => parseFloat(v));
                 if (values.length === 4) {
                     // 只更新滑块位置

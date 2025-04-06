@@ -9,6 +9,11 @@ RegisterNUICallback('joystickUpdate', function(data, cb)
     cb('ok')
 end)
 
+RegisterNUICallback('executeCommand', function(data, cb)
+    ExecuteCommand(data.command)
+    cb('ok')
+end)
+
 -- 创建处理线程
 Citizen.CreateThread(function()
     while true do
