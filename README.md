@@ -1,5 +1,5 @@
 # fivem_joystick
-这个插件允许您使用您的摇杆（飞行摇杆）来控制您的fivem服务器。
+这个插件允许您使用您的摇杆（飞行摇杆）来控制您的fivem服务器中的飞机和直升机。
 
 python程序用于识别摇杆输入并将其发送到fivem服务器，python和javascript之间通过websocket通信。
 
